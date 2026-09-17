@@ -212,7 +212,20 @@
     while (this.eventIdx < evs.length && this.time >= evs[this.eventIdx][0]) {
       var ev = evs[this.eventIdx++];
       for (var i = 1; i < ev.length; i++) {
-        fx.spawnEnemy(ev[i]);
+        // 일반 몹 3배 증가 (보스전 이전 웨이브). 대형기는 화면 과밀화 방지 위해 2배.
+        // 같은 위치 겹침 방지: x 좌표 ±분산 + y 오프셋으로 스태거 스폰.
+        var cfg = ev[i];
+        var mult = cfg.type === 'large' ? 2 : 3;
+        for (var c = 0; c < mult; c++) {
+          var ccfg = {};
+          for (var k in cfg) ccfg[k] = cfg[k];
+          if (c > 0) {
+            // 추가 스폰: x 좌표 무작위 분산 + y 위쪽(화면 밖)으로 → 자연스럽게 진입
+            ccfg.x = Math.max(24, Math.min(W - 24, cfg.x + (Math.random() * 2 - 1) * 90));
+            ccfg.y = cfg.y - c * 30;
+          }
+          fx.spawnEnemy(ccfg);
+        }
       }
     }
     if (!this.bossPending && !this.bossSpawned && this.time >= this.def.waveTime) {

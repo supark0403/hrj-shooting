@@ -106,6 +106,83 @@
     this.activeCount = 0;
   };
 
+  /* ============ 이미지 에셋 로더 (asset/ 폴더, 상대경로) ============ */
+  var ASSET_BASE = 'asset/';
+  var SPRITES = {
+    player: ASSET_BASE + 'flight/KakaoTalk_20260914_175332334_10.png',
+    bullet: ASSET_BASE + 'bullet/KakaoTalk_20260914_175332334_02.png',
+    boss: {
+      A: ASSET_BASE + 'boss/KakaoTalk_20260914_175332334_26.png',
+      B: ASSET_BASE + 'boss/KakaoTalk_20260914_175332334_28.png',
+      C: ASSET_BASE + 'boss/KakaoTalk_20260914_175335266.png',
+      D: ASSET_BASE + 'boss/KakaoTalk_20260914_175335266_02.png',
+      E: ASSET_BASE + 'boss/KakaoTalk_20260914_175335266_07.png'
+    },
+    monster: [
+      ASSET_BASE + 'monster/KakaoTalk_20260914_175332334_03.png',
+      ASSET_BASE + 'monster/KakaoTalk_20260914_175332334_06.png',
+      ASSET_BASE + 'monster/KakaoTalk_20260914_175332334_07.png',
+      ASSET_BASE + 'monster/KakaoTalk_20260914_175332334_09.png',
+      ASSET_BASE + 'monster/KakaoTalk_20260914_175332334_12.png',
+      ASSET_BASE + 'monster/KakaoTalk_20260914_175332334_13.png',
+      ASSET_BASE + 'monster/KakaoTalk_20260914_175332334_16.png',
+      ASSET_BASE + 'monster/KakaoTalk_20260914_175332334_18.png',
+      ASSET_BASE + 'monster/KakaoTalk_20260914_175332334_25.png',
+      ASSET_BASE + 'monster/KakaoTalk_20260914_175332334_29.png',
+      ASSET_BASE + 'monster/KakaoTalk_20260914_175335266_01.png',
+      ASSET_BASE + 'monster/KakaoTalk_20260914_175335266_03.png',
+      ASSET_BASE + 'monster/KakaoTalk_20260914_175335266_04.png',
+      ASSET_BASE + 'monster/KakaoTalk_20260914_175335266_05.png'
+    ]
+  };
+  // 적기체 타입 → 몬스터 스프라이트 인덱스 범위 (시각적 다양성)
+  var MONSTER_IDX = { small: [0, 5], medium: [6, 10], large: [11, 14], kamikaze: [3, 8] };
+
+  var Assets = (function () {
+    var cache = {};   // url -> HTMLImageElement
+    var loaded = 0, total = 0;
+    function load(url) {
+      if (cache[url]) return;
+      total++;
+      var img = new Image();
+      img.onload = function () { loaded++; };
+      img.onerror = function () { /* 로드 실패 시 벡터 폴백 유지 */ };
+      img.src = url;
+      cache[url] = img;
+    }
+    function preload() {
+      load(SPRITES.player);
+      load(SPRITES.bullet);
+      for (var k in SPRITES.boss) load(SPRITES.boss[k]);
+      for (var i = 0; i < SPRITES.monster.length; i++) load(SPRITES.monster[i]);
+    }
+    function get(url) { return cache[url] || null; }
+    function ready() { return total > 0 && loaded >= total; }
+    preload();
+    return { get: get, ready: ready, SPRITES: SPRITES };
+  })();
+
+  // 스프라이트 그리기 (로드 전/실패 시 벡터 폴백). rot: 라디안 회전.
+  function drawSprite(ctx, url, x, y, w, h, rot) {
+    var img = Assets.get(url);
+    if (img && img.complete && img.naturalWidth > 0) {
+      ctx.save();
+      ctx.translate(x, y);
+      if (rot) ctx.rotate(rot);
+      ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      ctx.restore();
+    } else {
+      // 폴백: 원형(이미지 미로드) — 호출부에서 추가 벡터는 직접 그림
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(x, y, Math.min(w, h) * 0.4, 0, Math.PI * 2);
+      ctx.fillStyle = '#8899aa';
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
   /* ============================ 플레이어 ============================ */
   function Player(x, y) {
     this.x = x; this.y = y;
@@ -118,6 +195,8 @@
     this.alive = true;
     this.deathTimer = 0;   // 사망 연출 타이머
     this.speed = 265;
+    this.power = 1;        // 무기 강화 레벨 (1~4, 파워업 드랍으로 상승)
+    this.laserTimer = 0;   // 레이저 발사 타이머 (power>=3)
   }
   Player.prototype.update = function (dt, input, fx) {
     if (!this.alive) {
@@ -145,21 +224,57 @@
 
     if (this.invuln > 0) this.invuln -= dt;
 
-    // 자동사격
+    // 자동사격 (파워레벨별 탄막)
     this.fireTimer -= dt;
+    var rate = this.power >= 4 ? 0.09 : 0.11;   // 발사 간격(초) — 고레벨일수록 연사
     while (this.fireTimer <= 0) {
-      this.fireTimer += 0.11;
-      var p = fx.playerBullets.get();
-      if (p) { p.x = this.x - 7; p.y = this.y - 12; p.vx = 0; p.vy = -640; p.r = 3; p.color = '#9fe8ff'; }
-      var q = fx.playerBullets.get();
-      if (q) { q.x = this.x + 7; q.y = this.y - 12; q.vx = 0; q.vy = -640; q.r = 3; q.color = '#9fe8ff'; }
-      fx.onPlayerShoot && fx.onPlayerShoot();
+      this.fireTimer += rate;
+      this.firePattern(fx);
     }
+    // 레이저 (power>=3): 주기적 직선 광선
+    if (this.power >= 3) {
+      this.laserTimer -= dt;
+      if (this.laserTimer <= 0) {
+        this.laserTimer = this.power >= 4 ? 1.1 : 1.6;
+        var lz = fx.playerBullets.get();
+        if (lz) {
+          lz.x = this.x; lz.y = this.y - 14; lz.vx = 0; lz.vy = -760;
+          lz.r = 6; lz.color = '#fff2a8'; lz.laser = true;   // 레이저 표시(렌더용)
+        }
+      }
+    }
+  }
+  // 파워레벨별 발사 패턴. 각도(라디안, -PI/2=직상)로 탄을 분산.
+  Player.prototype.firePattern = function (fx) {
+    var speed = 640;
+    var self = this;   // 내부 shoot 함수에서 this 참조용
+    function shoot(offsetX, angle) {
+      var b = fx.playerBullets.get();
+      if (!b) return;
+      b.x = self.x + offsetX; b.y = self.y - 12;
+      b.vx = Math.cos(angle) * speed; b.vy = Math.sin(angle) * speed;
+      b.r = 3; b.color = '#9fe8ff';
+    }
+    var UP = -Math.PI / 2;
+    if (this.power <= 1) {
+      shoot(-7, UP); shoot(7, UP);
+    } else if (this.power === 2) {
+      shoot(0, UP); shoot(-9, UP); shoot(9, UP);
+    } else if (this.power === 3) {
+      shoot(0, UP); shoot(-10, UP); shoot(10, UP);
+      shoot(-6, UP - 0.28); shoot(6, UP + 0.28);   // 사방 스프레드
+    } else {
+      // power 4: 5연발 직선 + 넓은 스프레드
+      shoot(0, UP); shoot(-11, UP); shoot(11, UP); shoot(-22, UP); shoot(22, UP);
+      shoot(-8, UP - 0.34); shoot(8, UP + 0.34);
+    }
+    fx.onPlayerShoot && fx.onPlayerShoot();
   };
   Player.prototype.hit = function () {
     if (!this.alive || this.invuln > 0) return false;
     this.hp--;
     this.invuln = 1.5;
+    if (this.power > 1) this.power--;   // 피격 시 무기 강화 1단계 손실
     if (this.hp <= 0) {
       this.alive = false;
       this.deathTimer = 0;
@@ -215,6 +330,10 @@
     else if (this.type === 'medium') { this.r = 15; }
     else if (this.type === 'large') { this.r = 24; }
     else { this.r = 9; } // kamikaze
+
+    // 몬스터 스프라이트 인덱스 (타입별 범위에서 무작위 — 시각적 다양성)
+    var rng = MONSTER_IDX[this.type] || [0, SPRITES.monster.length - 1];
+    this.spriteIdx = rng[0] + Math.floor(Math.random() * (rng[1] - rng[0] + 1));
   }
 
   Enemy.prototype.update = function (dt, fx) {
@@ -667,6 +786,8 @@
     Enemy: Enemy,
     Boss: Boss,
     PowerUp: PowerUp,
-    Starfield: Starfield
+    Starfield: Starfield,
+    Assets: Assets,
+    drawSprite: drawSprite
   };
 })(window);

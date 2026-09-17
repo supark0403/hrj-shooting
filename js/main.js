@@ -153,11 +153,7 @@
       var e = enemies[i];
       if (e.active) { e.hp -= 3; if (e.hp <= 0) killEnemy(i, true); }
     }
-    if (boss && boss.active && !boss.entering) {
-      boss.hp -= 25;
-      boss.stun = 1.6;
-      if (boss.hp <= 0) destroyBoss();
-    }
+    // 보스는 폭탄 데미지 무적 — 폭탄은 보스 공격 탄(적탄)만 소멸시키고, HP/스톤 감소 없음
   }
 
   /* ---------------- 격파 처리 ---------------- */
@@ -176,9 +172,14 @@
         }));
       }
     }
-    // 파워업 드랍
-    if ((e.type === 'medium' || e.type === 'large') && Math.random() < 0.22) {
-      powerups.push(new EN.PowerUp(e.x, e.y, Math.random() < 0.5 ? 'hp' : 'bomb'));
+    // 파워업 드랍 (무기강화 power / 체력 hp / 폭탄 bomb)
+    if ((e.type === 'medium' || e.type === 'large') && Math.random() < 0.3) {
+      var r = Math.random();
+      var kind = r < 0.5 ? 'power' : (r < 0.78 ? 'hp' : 'bomb');
+      powerups.push(new EN.PowerUp(e.x, e.y, kind));
+    } else if (e.type === 'small' && Math.random() < 0.03) {
+      // 소형기 드랍은 드물지만 존재 — 파워업 위주
+      powerups.push(new EN.PowerUp(e.x, e.y, Math.random() < 0.7 ? 'power' : 'hp'));
     }
     enemies.splice(idx, 1);
   }
@@ -381,10 +382,17 @@
       if (player.alive) {
         var ddx = pu.x - player.x, ddy = pu.y - player.y;
         if (ddx * ddx + ddy * ddy < 20 * 20) {
-          if (pu.kind === 'hp') { player.hp = Math.min(player.maxHp, player.hp + 1); }
-          else { player.bombs = Math.min(5, player.bombs + 1); }
+          if (pu.kind === 'hp') {
+            player.hp = Math.min(player.maxHp, player.hp + 1);
+          } else if (pu.kind === 'power') {
+            // 무기 강화: 파워레벨 1 상승 (최대 4) — 탄막/연사/레이저 강화
+            if (player.power < 4) player.power++;
+          } else {
+            player.bombs = Math.min(5, player.bombs + 1);
+          }
           AU.play('select');
-          explode(pu.x, pu.y, 8, pu.kind === 'hp' ? '#7dffb0' : '#ffd75e');
+          var pc = pu.kind === 'hp' ? '#7dffb0' : (pu.kind === 'power' ? '#ffd23e' : '#ff8a3e');
+          explode(pu.x, pu.y, 10, pc);
           powerups.splice(p, 1);
         }
       }
@@ -516,45 +524,45 @@
     // 무적 깜빡임
     if (p.invuln > 0 && Math.floor(p.invuln * 14) % 2 === 0) return;
 
+    var PW = 34, PH = 42; // 플레이어 스프라이트 표시 크기
     ctx.save();
     ctx.translate(p.x, p.y);
 
-    // 엔진 화염
+    // 엔진 화염 (스프라이트 아래)
     var fl = 6 + Math.random() * 7;
-    var fg = ctx.createLinearGradient(0, 10, 0, 10 + fl + 8);
+    var fg = ctx.createLinearGradient(0, PH / 2 - 4, 0, PH / 2 - 4 + fl + 8);
     fg.addColorStop(0, 'rgba(140,220,255,0.9)');
     fg.addColorStop(1, 'rgba(60,120,255,0)');
     ctx.fillStyle = fg;
     ctx.beginPath();
-    ctx.moveTo(-4, 10);
-    ctx.lineTo(0, 10 + fl + 8);
-    ctx.lineTo(4, 10);
+    ctx.moveTo(-4, PH / 2 - 4);
+    ctx.lineTo(0, PH / 2 - 4 + fl + 8);
+    ctx.lineTo(4, PH / 2 - 4);
     ctx.closePath();
     ctx.fill();
 
-    // 기체
-    var bg = ctx.createLinearGradient(0, -16, 0, 12);
-    bg.addColorStop(0, '#eaffff');
-    bg.addColorStop(0.5, '#7ec8ff');
-    bg.addColorStop(1, '#2a5fd6');
-    ctx.fillStyle = bg;
-    ctx.beginPath();
-    ctx.moveTo(0, -16);
-    ctx.lineTo(-5, -4);
-    ctx.lineTo(-13, 8);
-    ctx.lineTo(-7, 11);
-    ctx.lineTo(0, 7);
-    ctx.lineTo(7, 11);
-    ctx.lineTo(13, 8);
-    ctx.lineTo(5, -4);
-    ctx.closePath();
-    ctx.fill();
-
-    // 콕핏
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    ctx.arc(0, -6, 2.4, 0, TAU);
-    ctx.fill();
+    // 플레이어 기체 (펭귄 스프라이트, 위향) — 미로드 시 벡터 폴백
+    var img = EN.Assets.get(EN.Assets.SPRITES.player);
+    if (img && img.complete && img.naturalWidth > 0) {
+      ctx.drawImage(img, -PW / 2, -PH / 2, PW, PH);
+    } else {
+      var bg = ctx.createLinearGradient(0, -16, 0, 12);
+      bg.addColorStop(0, '#eaffff');
+      bg.addColorStop(0.5, '#7ec8ff');
+      bg.addColorStop(1, '#2a5fd6');
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.moveTo(0, -16);
+      ctx.lineTo(-5, -4);
+      ctx.lineTo(-13, 8);
+      ctx.lineTo(-7, 11);
+      ctx.lineTo(0, 7);
+      ctx.lineTo(7, 11);
+      ctx.lineTo(13, 8);
+      ctx.lineTo(5, -4);
+      ctx.closePath();
+      ctx.fill();
+    }
 
     // 히트박스 표시 (탄막 슈팅 관례)
     ctx.fillStyle = 'rgba(255,80,80,0.9)';
@@ -571,7 +579,15 @@
     var flash = e.flash > 0;
     if (flash) ctx.globalAlpha = 0.6;
 
-    if (e.type === 'small') {
+    // 타입별 스프라이트 표시 크기
+    var size = e.type === 'small' ? 24 : e.type === 'medium' ? 34 : e.type === 'large' ? 52 : 20;
+    var url = EN.Assets.SPRITES.monster[e.spriteIdx];
+    var img = EN.Assets.get(url);
+
+    if (img && img.complete && img.naturalWidth > 0) {
+      // 몬스터 스프라이트 (미로드/실패 시 벡터 폴백은 아래 else에서)
+      ctx.drawImage(img, -size / 2, -size / 2, size, size);
+    } else if (e.type === 'small') {
       var g1 = ctx.createLinearGradient(0, -10, 0, 10);
       g1.addColorStop(0, '#ffd9c8');
       g1.addColorStop(1, e.color);
@@ -590,10 +606,6 @@
       ctx.fillStyle = g2;
       hexPath(0, 0, 14);
       ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.75)';
-      ctx.beginPath();
-      ctx.arc(0, 0, 4 + (e.hp / e.maxHp) * 3, 0, TAU);
-      ctx.fill();
     } else if (e.type === 'large') {
       var g3 = ctx.createLinearGradient(0, -24, 0, 24);
       g3.addColorStop(0, '#fff0e6');
@@ -601,27 +613,38 @@
       ctx.fillStyle = g3;
       hexPath(0, 0, 22);
       ctx.fill();
-      // 내핵 + HP 링
+    } else { // kamikaze 폴백
+      var blink0 = 0.5 + 0.5 * Math.sin(e.t * 18);
+      ctx.globalAlpha = flash ? 0.6 : (0.55 + 0.45 * blink0);
+      ctx.fillStyle = '#ff4d4d';
+      ctx.beginPath();
+      ctx.arc(0, 0, 8, 0, TAU);
+      ctx.fill();
+    }
+
+    // 타입별 오버레이 (스프라이트 위에 HP 링 / 자폭기 표시)
+    if (e.type === 'medium') {
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.beginPath();
+      ctx.arc(0, 0, 4 + (e.hp / e.maxHp) * 3, 0, TAU);
+      ctx.fill();
+    } else if (e.type === 'large') {
       ctx.strokeStyle = 'rgba(255,255,255,0.8)';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(0, 0, 14, -Math.PI / 2, -Math.PI / 2 + TAU * (e.hp / e.maxHp));
+      ctx.arc(0, 0, size * 0.42, -Math.PI / 2, -Math.PI / 2 + TAU * (e.hp / e.maxHp));
       ctx.stroke();
       ctx.fillStyle = '#fff';
       ctx.beginPath();
       ctx.arc(0, 0, 5, 0, TAU);
       ctx.fill();
-    } else { // kamikaze
+    } else if (e.type === 'kamikaze') {
       var blink = 0.5 + 0.5 * Math.sin(e.t * 18);
       ctx.globalAlpha = flash ? 0.6 : (0.55 + 0.45 * blink);
-      ctx.fillStyle = '#ff4d4d';
-      ctx.beginPath();
-      ctx.arc(0, 0, 8, 0, TAU);
-      ctx.fill();
       ctx.strokeStyle = '#ffd23e';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(0, 0, 11 + blink * 3, 0, TAU);
+      ctx.arc(0, 0, size * 0.55 + blink * 3, 0, TAU);
       ctx.stroke();
     }
     ctx.restore();
@@ -644,26 +667,33 @@
     var pulse = 1 + Math.sin(b.t * 3) * 0.03;
     ctx.scale(pulse, pulse);
 
-    // 외곽 갑옷
-    var g = ctx.createLinearGradient(0, -b.r, 0, b.r);
-    g.addColorStop(0, '#ffffff');
-    g.addColorStop(0.25, b.color);
-    g.addColorStop(1, shade(b.color));
-    ctx.fillStyle = g;
-    polyPath(0, 0, b.r, sidesFor(b.kind), b.t * 0.15);
-    ctx.fill();
+    // 보스 스프라이트 (인물 사진, 아래/플레이어 방향) — 미로드 시 벡터 폴백
+    var bw = b.r * 2.4, bh = b.r * 2.6;
+    var url = EN.Assets.SPRITES.boss[b.kind];
+    var img = EN.Assets.get(url);
+    if (img && img.complete && img.naturalWidth > 0) {
+      ctx.drawImage(img, -bw / 2, -bh / 2, bw, bh);
+    } else {
+      // 외곽 갑옷 폴백
+      var g = ctx.createLinearGradient(0, -b.r, 0, b.r);
+      g.addColorStop(0, '#ffffff');
+      g.addColorStop(0.25, b.color);
+      g.addColorStop(1, shade(b.color));
+      ctx.fillStyle = g;
+      polyPath(0, 0, b.r, sidesFor(b.kind), b.t * 0.15);
+      ctx.fill();
+    }
 
-    // 내부 코어
-    var cg = ctx.createRadialGradient(0, 0, 2, 0, 0, b.r * 0.55);
-    cg.addColorStop(0, '#fff');
-    cg.addColorStop(0.5, b.color);
-    cg.addColorStop(1, 'rgba(0,0,0,0.6)');
+    // 내부 코어 (스프라이트 위에 약하게)
+    var cg = ctx.createRadialGradient(0, 0, 2, 0, 0, b.r * 0.4);
+    cg.addColorStop(0, 'rgba(255,255,255,0.35)');
+    cg.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = cg;
     ctx.beginPath();
-    ctx.arc(0, 0, b.r * 0.5, 0, TAU);
+    ctx.arc(0, 0, b.r * 0.4, 0, TAU);
     ctx.fill();
 
-    // 타입별 장식
+    // 타입별 장식 (스프라이트 위에 오버레이)
     if (b.kind === 'A') {
       ctx.strokeStyle = 'rgba(255,255,255,0.7)';
       ctx.lineWidth = 3;
@@ -750,18 +780,35 @@
   }
 
   function drawBullets() {
-    // 적탄: 외곽 글로우 + 흰 코어 (라디얼 그라데이션 없이 2회 원 그리기 — 성능)
+    // 적탄: bullet 스프라이트 (속도 방향 회전) + 글로우 — 미로드 시 원형 폴백
+    var burl = EN.Assets.SPRITES.bullet;
     enemyBullets.forEachActive(function (b) {
-      ctx.globalAlpha = 0.45;
-      ctx.fillStyle = b.color;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, b.r + 3, 0, TAU);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, b.r * 0.55, 0, TAU);
-      ctx.fill();
+      var img = EN.Assets.get(burl);
+      if (img && img.complete && img.naturalWidth > 0) {
+        var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 1;
+        // 스프라이트 정면(아래/+y)을 이동 방향에 맞춤
+        var rot = Math.atan2(b.vy, b.vx) - Math.PI / 2;
+        var s = b.r * 4.2; // 표시 크기 (원형 r의 ~4배 — 탄알 느낌)
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = b.color;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, s * 0.6, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+        EN.drawSprite(ctx, burl, b.x, b.y, s, s, rot);
+      } else {
+        ctx.globalAlpha = 0.45;
+        ctx.fillStyle = b.color;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r + 3, 0, TAU);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r * 0.55, 0, TAU);
+        ctx.fill();
+      }
     });
     // 플레이어 탄
     ctx.fillStyle = '#bff3ff';
@@ -793,7 +840,18 @@
     ctx.translate(pu.x, pu.y);
     var bob = Math.sin(pu.t) * 2;
     ctx.translate(0, bob);
+    // 외곽 글로우 링 (종류별 색)
+    var ring = pu.kind === 'hp' ? '#7dffb0' : (pu.kind === 'power' ? '#ffd23e' : '#ff8a3e');
+    ctx.strokeStyle = ring;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.6 + 0.4 * Math.abs(Math.sin(pu.t));
+    ctx.beginPath();
+    ctx.arc(0, 0, 11, 0, TAU);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
     if (pu.kind === 'hp') {
+      // 체력: 초록 + 흰 십자
       ctx.fillStyle = '#7dffb0';
       ctx.beginPath();
       ctx.arc(0, 0, 8, 0, TAU);
@@ -801,8 +859,26 @@
       ctx.fillStyle = '#fff';
       ctx.fillRect(-1.5, -4.5, 3, 9);
       ctx.fillRect(-4.5, -1.5, 9, 3);
+    } else if (pu.kind === 'power') {
+      // 무기 강화: 노란 원 + 흰 화살표(상승) — 탄막 레벨업
+      ctx.fillStyle = '#ffd23e';
+      ctx.beginPath();
+      ctx.arc(0, 0, 8, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(0, -4.5);
+      ctx.lineTo(4, 1);
+      ctx.lineTo(1.6, 1);
+      ctx.lineTo(1.6, 4.5);
+      ctx.lineTo(-1.6, 4.5);
+      ctx.lineTo(-1.6, 1);
+      ctx.lineTo(-4, 1);
+      ctx.closePath();
+      ctx.fill();
     } else {
-      ctx.fillStyle = '#ffd75e';
+      // 폭탄: 주황 + 'B'
+      ctx.fillStyle = '#ff8a3e';
       ctx.beginPath();
       ctx.arc(0, 0, 8, 0, TAU);
       ctx.fill();
@@ -840,6 +916,21 @@
       if (i < player.hp) {
         ctx.fillStyle = player.hp === 1 ? '#ff5e6c' : '#7dffb0';
         ctx.fillRect(x + 1, hpY + 1, 20, 6);
+      }
+    }
+
+    // 무기 강화 레벨 바 (PWR 1~4)
+    var pwX = 12, pwY = 62;
+    ctx.font = '10px Consolas, monospace';
+    ctx.fillStyle = '#9fb4ff';
+    ctx.fillText('PWR', pwX, pwY + 1);
+    for (var q = 0; q < 4; q++) {
+      var qx = pwX + 28 + q * 16;
+      ctx.fillStyle = 'rgba(255,255,255,0.15)';
+      ctx.fillRect(qx, pwY, 13, 8);
+      if (q < player.power) {
+        ctx.fillStyle = q >= 3 ? '#ff6b8a' : '#ffd23e';
+        ctx.fillRect(qx + 1, pwY + 1, 11, 6);
       }
     }
 
