@@ -1,0 +1,168 @@
+/* HRJ SHOOTING - 스타일 */
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #04050c;
+  overflow: hidden;
+  font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  color: #e8ecff;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* 게임 영역: 480x640 비율 유지, 창 크기에 맞춰 등비 확대 (높이/너비 모두 제한) */
+#game-wrap {
+  position: relative;
+  margin: 0 auto;
+  width: min(100vw, calc(100vh * 480 / 640));
+  height: min(100vh, calc(100vw * 640 / 480));
+  background: #000;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+/* ---------- 오버레이 화면 공통 ---------- */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  padding: 16px;
+  background: rgba(3, 5, 15, 0.72);
+  backdrop-filter: blur(2px);
+}
+
+.screen.hidden { display: none; }
+
+/* ---------- 메인 메뉴 ---------- */
+#menu-screen {
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(40, 60, 160, 0.35), transparent 60%),
+    rgba(3, 5, 15, 0.82);
+}
+
+.title-block { margin-bottom: 6px; }
+
+.game-title {
+  margin: 0;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 44px;
+  line-height: 1.05;
+  letter-spacing: 6px;
+  color: #fff;
+  text-shadow:
+    0 0 8px #4da3ff,
+    0 0 24px #2a6bff,
+    0 0 48px #1b3fd6;
+}
+
+.subtitle {
+  margin: 8px 0 0;
+  font-size: 13px;
+  letter-spacing: 4px;
+  color: #9fb4ff;
+}
+
+.help-box {
+  background: rgba(10, 16, 42, 0.75);
+  border: 1px solid rgba(90, 130, 255, 0.35);
+  border-radius: 10px;
+  padding: 10px 18px;
+  max-width: 86%;
+}
+
+.help-box h3 {
+  margin: 4px 0 6px;
+  font-size: 14px;
+  color: #ffd75e;
+  letter-spacing: 2px;
+}
+
+.help-box ul {
+  margin: 0;
+  padding-left: 18px;
+  text-align: left;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: #cdd8ff;
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: #8fa0d8;
+  letter-spacing: 1px;
+}
+
+/* ---------- 버튼 ---------- */
+.btn {
+  appearance: none;
+  border: 1px solid rgba(120, 160, 255, 0.5);
+  background: linear-gradient(180deg, rgba(30, 45, 110, 0.9), rgba(16, 24, 64, 0.9));
+  color: #eaf0ff;
+  font-family: inherit;
+  font-size: 15px;
+  letter-spacing: 2px;
+  padding: 10px 30px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.06s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.btn:hover {
+  box-shadow: 0 0 14px rgba(90, 140, 255, 0.55);
+  transform: translateY(-1px);
+}
+
+.btn:active { transform: translateY(1px) scale(0.98); }
+
+.btn-primary {
+  border-color: #ffd75e;
+  background: linear-gradient(180deg, rgba(140, 100, 20, 0.9), rgba(70, 45, 8, 0.9));
+  color: #fff3cf;
+}
+
+.btn-primary:hover { box-shadow: 0 0 16px rgba(255, 200, 80, 0.6); }
+
+.btn-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+/* ---------- 스크린 제목 ---------- */
+.screen-title {
+  margin: 0;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 34px;
+  letter-spacing: 5px;
+}
+
+.clear-title { color: #7dffb0; text-shadow: 0 0 12px rgba(60, 255, 150, 0.8); }
+.over-title { color: #ff5e6c; text-shadow: 0 0 12px rgba(255, 70, 90, 0.8); }
+.victory-title { color: #ffd75e; text-shadow: 0 0 14px rgba(255, 200, 60, 0.9), 0 0 34px rgba(255, 150, 30, 0.5); }
+
+/* ---------- 점수 테이블 ---------- */
+.score-table {
+  border-collapse: collapse;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 14px;
+  min-width: 240px;
+}
+
+.score-table td {
+  padding: 5px 14px;
+  border-bottom: 1px solid rgba(110, 140, 255, 0.22);
+}
+
+.score-table td.num { text-align: right; color: #ffe9a8; }
+.score-table .total-row td { font-weight: bold; color: #fff; border-top: 1px solid rgba(160, 190, 255, 0.4); }
+.score-table .final-row td { font-size: 16px; color: #ffd75e; }
